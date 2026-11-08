@@ -1,0 +1,12 @@
+{
+  "required": true,
+  "minVersion": "0.8",
+  "package": "com.tr4nce.rabbitauth.smoke",
+  "compatibilityLevel": "JAVA_21",
+  "server": [
+    "SmokeMainMixin"
+  ],
+  "injectors": {
+    "defaultRequire": 1
+  }
+}
