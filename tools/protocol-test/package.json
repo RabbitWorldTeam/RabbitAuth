@@ -1,0 +1,1 @@
+{"private":true,"type":"module","scripts":{"test":"node integration.mjs"},"devDependencies":{"minecraft-protocol":"^1.68.0","ws":"^8.22.1"}}
