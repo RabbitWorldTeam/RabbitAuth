@@ -1,0 +1,135 @@
+plugins {
+    id 'java-library'
+    id 'net.neoforged.moddev' version '2.0.148'
+}
+
+version = mod_version
+group = mod_group_id
+base { archivesName = mod_id }
+java.toolchain.languageVersion = JavaLanguageVersion.of(21)
+
+repositories { mavenCentral() }
+
+sourceSets {
+    test {
+        compileClasspath += sourceSets.main.compileClasspath
+        runtimeClasspath += sourceSets.main.runtimeClasspath
+    }
+    smoke {
+        compileClasspath += sourceSets.main.output + sourceSets.main.compileClasspath
+        runtimeClasspath += sourceSets.main.output + sourceSets.main.runtimeClasspath
+    }
+}
+
+neoForge {
+    version = neo_version
+    runs {
+        server {
+            server()
+            gameDirectory = file('run/server')
+            programArgument '--nogui'
+        }
+        smokeServer {
+            server()
+            gameDirectory = file('run/smoke')
+            programArgument '--nogui'
+            programArgument '--initSettings'
+            systemProperty 'rabbitauth.smoke', 'true'
+        }
+    }
+    mods {
+        rabbitauth { sourceSet sourceSets.main }
+        rabbitauth_smoke { sourceSet sourceSets.smoke }
+    }
+}
+
+dependencies {
+    implementation(jarJar('org.bouncycastle:bcprov-jdk18on:1.80'))
+    implementation(jarJar('org.xerial:sqlite-jdbc:3.49.1.0'))
+    implementation(jarJar('com.mysql:mysql-connector-j:9.2.0')) {
+        exclude group: 'com.google.protobuf', module: 'protobuf-java'
+    }
+    // NeoForge 1.21.1 needs explicit runtime libraries in development.
+    additionalRuntimeClasspath 'org.bouncycastle:bcprov-jdk18on:1.80'
+    additionalRuntimeClasspath 'org.xerial:sqlite-jdbc:3.49.1.0'
+    additionalRuntimeClasspath('com.mysql:mysql-connector-j:9.2.0') {
+        exclude group: 'com.google.protobuf', module: 'protobuf-java'
+    }
+}
+
+tasks.named('processResources', ProcessResources) {
+    def properties = [mod_id: mod_id, mod_name: mod_name, mod_version: mod_version,
+                      mod_license: mod_license, mod_authors: mod_authors,
+                      mod_description: mod_description, minecraft_version: minecraft_version,
+                      neo_version: neo_version]
+    inputs.properties properties
+    filesMatching('META-INF/neoforge.mods.toml') { expand properties }
+}
+
+tasks.withType(JavaCompile).configureEach { options.encoding = 'UTF-8' }
+tasks.named('jar') {
+    from('LICENSE') { into 'META-INF'; rename { 'LICENSE-RabbitAuth' } }
+    from('THIRD_PARTY_NOTICES.md') { into 'META-INF' }
+}
+
+tasks.register('authTest', JavaExec) {
+    dependsOn testClasses
+    classpath = sourceSets.test.runtimeClasspath
+    mainClass = 'com.tr4nce.rabbitauth.AuthRegressionTest'
+    workingDir = layout.buildDirectory.dir('auth-test').get().asFile
+    doFirst { workingDir.mkdirs() }
+}
+
+tasks.register('verifyArtifact') {
+    dependsOn jar
+    inputs.file tasks.named('jar').flatMap { it.archiveFile }
+    doLast {
+        def archive = tasks.named('jar').get().archiveFile.get().asFile
+        new java.util.zip.ZipFile(archive).withCloseable { zip ->
+            def names = zip.entries().collect { it.name }
+            ['META-INF/neoforge.mods.toml', 'META-INF/jarjar/metadata.json',
+             'META-INF/LICENSE-RabbitAuth', 'rabbitauth.mixins.json',
+             'auth-defaults.properties', 'languages/zh-CN.properties', 'languages/en-US.properties'].each {
+                if (!names.contains(it)) throw new GradleException("Missing artifact entry: " + it)
+            }
+            if (names.any { it.contains('/smoke/') || it.contains('smoke.mixins') || it.contains('AuthRegressionTest') })
+                throw new GradleException('Development test code leaked into production artifact')
+            def metadata = new groovy.json.JsonSlurper().parse(zip.getInputStream(zip.getEntry('META-INF/jarjar/metadata.json')))
+            def libraries = metadata.jars.collect { it.identifier.artifact }.toSet()
+            if (libraries != ['bcprov-jdk18on', 'sqlite-jdbc', 'mysql-connector-j'].toSet())
+                throw new GradleException('Unexpected embedded runtime dependencies: ' + libraries)
+            metadata.jars.each {
+                if (!names.contains(it.path)) throw new GradleException('Missing embedded dependency: ' + it.path)
+            }
+            logger.lifecycle('RabbitAuth artifact verified: dedicated mod resources and all three runtime libraries; no development checks bundled')
+        }
+    }
+}
+
+tasks.named('check') { dependsOn 'authTest', 'verifyArtifact' }
+// Regression checks use a standalone Java entry point, not JUnit.
+tasks.named('test') { exclude '**/AuthRegressionTest*.class' }
+
+tasks.named('runSmokeServer') {
+    def marker = layout.projectDirectory.file('run/smoke/smoke-success.txt')
+    doFirst { java.nio.file.Files.deleteIfExists(marker.asFile.toPath()) }
+    doLast {
+        if (!marker.asFile.exists() || marker.asFile.text.trim() != 'RABBITAUTH_SMOKE_OK')
+            throw new GradleException('NeoForge smoke probe did not complete')
+    }
+}
+
+// Development-only fixture: compile the bridge sources in the game-layer test mod.
+if (providers.gradleProperty('bridgeIntegration').isPresent()) {
+    sourceSets.smoke.java {
+        srcDir '../RabbitCore/src/main/java'
+        include 'com/tr4nce/rabbitauth/**'
+        include 'com/tr4nce/rabbitcore/bridge/**'
+        include 'com/tr4nce/rabbitcore/world/storage/BridgePreferencesData.java'
+        exclude 'com/tr4nce/rabbitcore/bridge/BridgeEvents.java'
+    }
+    tasks.named('processSmokeResources') {
+        from('../RabbitCore/src/main/resources') { include 'assets/rabbitcore/lang/death_zh_cn.json' }
+    }
+    neoForge.runs.server { systemProperty 'rabbitauth.bridgeIntegration', 'true' }
+}
