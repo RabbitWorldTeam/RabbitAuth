@@ -44,14 +44,14 @@ neoForge {
 }
 
 dependencies {
-    implementation(jarJar('org.bouncycastle:bcprov-jdk18on:1.80'))
-    implementation(jarJar('org.xerial:sqlite-jdbc:3.49.1.0'))
+    implementation(jarJar('org.bouncycastle:bcprov-jdk18on:1.86'))
+    implementation(jarJar('org.xerial:sqlite-jdbc:3.54.1.0'))
     implementation(jarJar('com.mysql:mysql-connector-j:9.2.0')) {
         exclude group: 'com.google.protobuf', module: 'protobuf-java'
     }
     // NeoForge 1.21.1 needs explicit runtime libraries in development.
-    additionalRuntimeClasspath 'org.bouncycastle:bcprov-jdk18on:1.80'
-    additionalRuntimeClasspath 'org.xerial:sqlite-jdbc:3.49.1.0'
+    additionalRuntimeClasspath 'org.bouncycastle:bcprov-jdk18on:1.86'
+    additionalRuntimeClasspath 'org.xerial:sqlite-jdbc:3.54.1.0'
     additionalRuntimeClasspath('com.mysql:mysql-connector-j:9.2.0') {
         exclude group: 'com.google.protobuf', module: 'protobuf-java'
     }
