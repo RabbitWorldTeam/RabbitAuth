@@ -15,8 +15,8 @@ Argon2id、SQLite 和 MySQL JDBC 依赖随 JAR 内置。
 
 | 指令 | 作用 |
 | --- | --- |
-| /register <密码> <确认密码> | 注册并认证 |
-| /login <密码> | 验证密码 |
+| /register <密码> <确认密码> 或 /r <密码> <确认密码> | 注册并认证 |
+| /login <密码> 或 /l <密码> | 验证密码 |
 | /changepassword <旧密码> <新密码> | 已认证玩家修改密码 |
 | /rabbitauth resetpassword <名称> <新密码> | 控制台或已认证的权限等级 4 管理员重置密码 |
 
@@ -98,7 +98,7 @@ config/rabbitauth/
 command-whitelist=/help(?: .*)?;;/rules
 ```
 
-匹配区分大小写，使用完整匹配；login/register 始终可用。Java properties 中的正则反斜杠需要写成双反斜杠。
+匹配区分大小写，使用完整匹配；login/register 和别名 l/r 始终可用。Java properties 中的正则反斜杠需要写成双反斜杠。
 放行指令仍遵守原本权限。默认拒绝其他模组在游戏阶段的自定义交互数据包，配置阶段的 NeoForge 握手不受此过滤影响。
 
 同 IP 免登录票据只保存在内存，重启后失效；改密和管理员重置会使旧票据失效。

@@ -2,6 +2,7 @@ package com.tr4nce.rabbitauth.mixin;
 
 import com.tr4nce.rabbitauth.RabbitAuth;
 import com.tr4nce.rabbitauth.auth.AuthService;
+import com.tr4nce.rabbitauth.auth.CommandPolicy;
 import com.tr4nce.rabbitauth.i18n.MessageKey;
 import com.tr4nce.rabbitauth.protection.Protection;
 import net.minecraft.server.level.ServerPlayer;
@@ -26,7 +27,8 @@ public abstract class GameListenerMixin {
     }
     @Unique private boolean rabbitAuth$handle(String input) {
         String rawRoot = input.split(" ", 2)[0];
-        String root = rawRoot.startsWith("rabbitauth:") ? rawRoot.substring("rabbitauth:".length()) : rawRoot;
+        String root = CommandPolicy.canonicalRoot(rawRoot.startsWith("rabbitauth:")
+                ? rawRoot.substring("rabbitauth:".length()) : rawRoot);
         if (root.equals("rabbitauth") && input.matches("\\S+ +whitelist(?: .*|$)")) return Protection.locked(player);
         boolean reset = root.equals("rabbitauth");
         if (!root.equals("login") && !root.equals("register") && !root.equals("changepassword") && !reset) {
