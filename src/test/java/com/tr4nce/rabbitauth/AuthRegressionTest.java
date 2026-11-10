@@ -77,6 +77,9 @@ public final class AuthRegressionTest {
         var rules = List.of(java.util.regex.Pattern.compile("/help(?: .*)?"));
         check(com.tr4nce.rabbitauth.auth.CommandPolicy.allowed("login secret", List.of()), "login always available");
         check(com.tr4nce.rabbitauth.auth.CommandPolicy.allowed("/register a a", List.of()), "registration always available");
+        check(com.tr4nce.rabbitauth.auth.CommandPolicy.allowed("/l secret", List.of()), "login alias always available");
+        check(com.tr4nce.rabbitauth.auth.CommandPolicy.allowed("r a a", List.of()), "registration alias always available");
+        check(!com.tr4nce.rabbitauth.auth.CommandPolicy.allowed("lother secret", List.of()), "alias requires an exact root");
         check(com.tr4nce.rabbitauth.auth.CommandPolicy.allowed("help page", rules), "regex whitelist");
         check(!com.tr4nce.rabbitauth.auth.CommandPolicy.allowed("minecraft:help", rules), "namespace cannot bypass whitelist");
         check(!com.tr4nce.rabbitauth.auth.CommandPolicy.allowed("op Rabbit", rules), "privileged command blocked");
