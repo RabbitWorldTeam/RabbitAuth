@@ -8,7 +8,10 @@ for(const phase of ['main','restart']){
  results.push({phase,...result});
 }
 const total=results.reduce((sum,result)=>sum+result.checks.length,0);
-const hash=crypto.createHash('sha256').update(await fs.readFile(new URL('build/libs/rabbitauth-0.1.0-SNAPSHOT.jar',root))).digest('hex');
+const properties=new Map((await fs.readFile(new URL('gradle.properties',root),'utf8'))
+ .split(/\r?\n/).filter(line=>line.includes('=')).map(line=>line.split(/=(.*)/s,2)));
+const artifact=`${properties.get('mod_id')}-${properties.get('minecraft_version')}-neoforge-${properties.get('mod_version')}.jar`;
+const hash=crypto.createHash('sha256').update(await fs.readFile(new URL('build/libs/'+artifact,root))).digest('hex');
 const text='# 白名单与群聊管理验收\n\n日期：2026-11-08（Asia/Hong_Kong）。\n\n'+
 'RabbitAuth build/runSmokeServer 通过：121 项 Java 回归、生产 JAR 检查、7 个 Mixin 变换。RabbitCore build 通过：73 项桥接回归。\n\n'+
 '真实开发服与模拟群聊端两轮共 '+total+' 项检查通过。SQLite 数据在正常停服和重启之间保留。\n\n'+
