@@ -11,6 +11,7 @@ import com.tr4nce.rabbitauth.storage.*;
 import java.net.*;
 import java.util.*;
 import java.util.concurrent.*;
+import net.minecraft.ChatFormatting;
 import net.minecraft.network.Connection;
 import net.minecraft.network.chat.Component;
 import net.minecraft.server.MinecraftServer;
@@ -302,8 +303,17 @@ public final class AuthService implements AutoCloseable {
     }
     public static Component message(MessageKey key, Object... arguments) {
         AuthService service = RabbitAuth.serviceOrNull();
-        return Component.literal(service == null ? Messages.fallback(PREFIX) + Messages.fallback(key, arguments)
-                : service.messages.format(PREFIX) + service.messages.format(key, arguments));
+        String prefix = service == null ? Messages.fallback(PREFIX) : service.messages.format(PREFIX);
+        String text = service == null ? Messages.fallback(key, arguments) : service.messages.format(key, arguments);
+        ChatFormatting color = switch (key) {
+            case REGISTER_PROMPT, LOGIN_PROMPT, USAGE, RESET_USAGE -> ChatFormatting.AQUA;
+            case SUCCESS, ALREADY_AUTHENTICATED, PASSWORD_CHANGED, RESET_SUCCESS, WHITELIST_RESULT -> ChatFormatting.GREEN;
+            case WAIT, BUSY, REENTER_WAIT, LOGIN_FIRST, ALREADY_REGISTERED, REGISTER_FIRST,
+                    PASSWORD_MISMATCH, PASSWORD_LENGTH, NAME_CASE -> ChatFormatting.YELLOW;
+            default -> ChatFormatting.RED;
+        };
+        return Component.literal(prefix).withStyle(ChatFormatting.GOLD)
+                .append(Component.literal(text).withStyle(color));
     }
     public static void send(ServerPlayer player, MessageKey key, Object... arguments) { player.sendSystemMessage(message(key, arguments)); }
     @Override public void close() throws Exception {
