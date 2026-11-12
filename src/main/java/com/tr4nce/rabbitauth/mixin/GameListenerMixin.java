@@ -29,7 +29,7 @@ public abstract class GameListenerMixin {
         String rawRoot = input.split(" ", 2)[0];
         String root = CommandPolicy.canonicalRoot(rawRoot.startsWith("rabbitauth:")
                 ? rawRoot.substring("rabbitauth:".length()) : rawRoot);
-        if (root.equals("rabbitauth") && input.matches("\\S+ +whitelist(?: .*|$)")) return Protection.locked(player);
+        if (root.equals("rabbitauth") && input.matches("\\S+ +(?:whitelist|forcelogin)(?: .*|$)")) return Protection.locked(player);
         boolean reset = root.equals("rabbitauth");
         if (!root.equals("login") && !root.equals("register") && !root.equals("changepassword") && !reset) {
             return Protection.locked(player) && !Protection.commandAllowed(input);

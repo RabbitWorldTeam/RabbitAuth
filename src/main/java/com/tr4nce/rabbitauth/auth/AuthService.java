@@ -148,6 +148,7 @@ public final class AuthService implements AutoCloseable {
         AuthSession replacement = new AuthSession(player, old.ip, old.deadline);
         replacement.authenticated = true;
         replacement.protectionReady = true;
+        replacement.rememberAllowed = old.rememberAllowed;
         replacement.returnPosition = old.returnPosition;
         sessions.put(player.getUUID(), replacement);
         // Respawn's initial inventory packets were masked before the new entity inherited the session.
@@ -265,6 +266,72 @@ public final class AuthService implements AutoCloseable {
             send(player, BUSY);
         }
     }
+    public int forceLogin(net.minecraft.commands.CommandSourceStack source, ServerPlayer player) {
+        ServerPlayer actor = source.getPlayer();
+        if (!source.hasPermission(4) || (actor != null && !authenticated(actor))) {
+            source.sendFailure(message(NO_PERMISSION));
+            return 0;
+        }
+        String name = player.getGameProfile().getName();
+        AuthSession session = session(player);
+        if (session == null || !current(session)) {
+            source.sendFailure(message(FORCE_LOGIN_UNAVAILABLE, name));
+            return 0;
+        }
+        if (session.authenticated) {
+            source.sendFailure(message(FORCE_LOGIN_ALREADY_AUTHENTICATED, name));
+            return 0;
+        }
+        if (!session.protectionReady || session.busy) {
+            source.sendFailure(message(WAIT));
+            return 0;
+        }
+        Component denied = whitelist.denial(name);
+        if (denied != null) {
+            source.sendFailure(denied);
+            return 0;
+        }
+        session.busy = true;
+        try {
+            workers.execute(() -> {
+                try {
+                    if (current(session)) {
+                        store.verifyAvailable();
+                        store.stagePosition(player.getUUID(), session.returnPosition, false);
+                        store.persistPosition(player.getUUID(), session.returnPosition);
+                    }
+                    server.execute(() -> {
+                        session.busy = false;
+                        if (!current(session)) {
+                            source.sendFailure(message(FORCE_LOGIN_UNAVAILABLE, name));
+                            return;
+                        }
+                        session.rememberAllowed = false;
+                        authenticate(session);
+                        if (!session.authenticated) {
+                            source.sendFailure(message(WHITELIST_DENIED));
+                            return;
+                        }
+                        RabbitAuth.LOGGER.info("{} forced RabbitAuth login for {}", source.getTextName(), name);
+                        source.sendSuccess(() -> message(FORCE_LOGIN_SUCCESS, name), false);
+                    });
+                } catch (Exception exception) {
+                    RabbitAuth.LOGGER.error("Unable to persist forced login for {}", name, exception);
+                    server.execute(() -> {
+                        session.busy = false;
+                        if (current(session)) player.connection.disconnect(message(STORAGE_UNAVAILABLE));
+                        source.sendFailure(message(STORAGE_UNAVAILABLE));
+                    });
+                }
+            });
+            return 1;
+        } catch (RejectedExecutionException exception) {
+            session.busy = false;
+            source.sendFailure(message(BUSY));
+            return 0;
+        }
+    }
+
     public void resetPassword(net.minecraft.commands.CommandSourceStack source, String name, String value) {
         ServerPlayer actor = source.getPlayer();
         if (!source.hasPermission(4) || (actor != null && !authenticated(actor))) {
@@ -307,7 +374,7 @@ public final class AuthService implements AutoCloseable {
         String text = service == null ? Messages.fallback(key, arguments) : service.messages.format(key, arguments);
         ChatFormatting color = switch (key) {
             case REGISTER_PROMPT, LOGIN_PROMPT, USAGE, RESET_USAGE -> ChatFormatting.AQUA;
-            case SUCCESS, ALREADY_AUTHENTICATED, PASSWORD_CHANGED, RESET_SUCCESS, WHITELIST_RESULT -> ChatFormatting.GREEN;
+            case SUCCESS, ALREADY_AUTHENTICATED, PASSWORD_CHANGED, RESET_SUCCESS, FORCE_LOGIN_SUCCESS, WHITELIST_RESULT -> ChatFormatting.GREEN;
             case WAIT, BUSY, REENTER_WAIT, LOGIN_FIRST, ALREADY_REGISTERED, REGISTER_FIRST,
                     PASSWORD_MISMATCH, PASSWORD_LENGTH, NAME_CASE -> ChatFormatting.YELLOW;
             default -> ChatFormatting.RED;
