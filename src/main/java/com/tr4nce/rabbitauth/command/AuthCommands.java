@@ -7,11 +7,15 @@ import com.tr4nce.rabbitauth.auth.CommandPolicy;
 import java.util.List;
 import net.minecraft.commands.CommandSourceStack;
 import net.minecraft.commands.Commands;
+import net.minecraft.commands.arguments.EntityArgument;
 
 public final class AuthCommands {
     private AuthCommands() {}
     public static void register(CommandDispatcher<CommandSourceStack> dispatcher) {
         dispatcher.register(Commands.literal("rabbitauth").requires(source -> source.hasPermission(4))
+                .then(Commands.literal("forcelogin").then(Commands.argument("player", EntityArgument.player())
+                        .executes(context -> RabbitAuth.service().forceLogin(context.getSource(),
+                                EntityArgument.getPlayer(context, "player")))))
                 .then(Commands.literal("resetpassword").then(Commands.argument("name", StringArgumentType.word())
                 .then(Commands.argument("password", StringArgumentType.word()).executes(c -> {
                     RabbitAuth.service().resetPassword(c.getSource(), StringArgumentType.getString(c, "name"), StringArgumentType.getString(c, "password"));
